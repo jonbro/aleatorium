@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "buddabox_lib")(type "KiCad")(uri "${KIPRJMOD}/buddabox_lib.kicad_sym")(options "")(descr ""))
+)
