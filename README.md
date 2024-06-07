@@ -1,6 +1,6 @@
 # Aleatorium
 
-![buddha box with heads](Images/ImageWithHeads.png)
+![buddha box with heads](Docs/ImageWithHeads.png)
 
 A lua scriptable buddha box board swap.
 
