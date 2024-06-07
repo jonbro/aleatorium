@@ -1,5 +1,3 @@
-
-
 param = {
     timbre = 10,
     color = 11,
@@ -82,7 +80,7 @@ envTarget = {
     pan = 6,
 }
 
-lfoTargets = {
+lfoTarget = {
     volume = 0,
     timbre = 1,
     color = 2,
