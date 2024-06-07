@@ -11,7 +11,9 @@ The firmware contains an lua scriptable 8 channel synthesizer and sequencer. The
 - 1 assignable lfo + 2 semi assignable Envs per voice
 - lowpass filter per voice
 - reverb & delay send per voice
+
 The sequencer is a callback that is run at 96ppq. All further sequencing must be done by you.
+
 You write new songs for aleatorium by connecting to it with usb, and loading lua scripts onto it with the [web based code editor](https://github.com/jonbro/aleatorium-editor).
 
 ## Scripting API
@@ -48,4 +50,28 @@ setParam(0, param.env1Target, envTarget.cutoff)
 -- LFO target - can be sent into params including env parameters
 setParam(0, param.lfo1Target, lfoTarget.env12Attack)
 
+```
+
+## Editor notes
+
+[A live version of the editor is available here](https://jonbro.github.io/aleatorium-editor/). Requires a non-firefox browser, due to using webserial. Make sure you connect to the device before you start trying to use it.
+
+Use `ctrl+p` to send the current script to device and execute. You can run the following commands in the console:
+
+```
+
+-- save
+-- provide a filename without quotes to save the file. This will add it to the set of songs that is looped through when pressing the button.
+-- scripts are limited to a maximum of 16k
+-- folders are not currently supported
+save(mysong.lua)
+
+-- load
+-- provide a filename without quotes to load the file. This will replace the contents of the editor with the script.
+-- folders are not currently supported. You cannot load the globals file.
+load(mysong.lua)
+
+-- del / rm
+-- provide a filename without quotes to delete the file. This will remove it from the filesystem, and it will no longer be part of the songs on device
+rm(mysong.lua)
 ```
