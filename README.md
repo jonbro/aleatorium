@@ -64,14 +64,14 @@ Use `ctrl+p` to send the current script to device and execute. You can run the f
 -- provide a filename without quotes to save the file. This will add it to the set of songs that is looped through when pressing the button.
 -- scripts are limited to a maximum of 16k
 -- folders are not currently supported
-save(mysong.lua)
+save mysong.lua
 
 -- load
 -- provide a filename without quotes to load the file. This will replace the contents of the editor with the script.
 -- folders are not currently supported. You cannot load the globals file.
-load(mysong.lua)
+load mysong.lua
 
 -- del / rm
 -- provide a filename without quotes to delete the file. This will remove it from the filesystem, and it will no longer be part of the songs on device
-rm(mysong.lua)
+rm mysong.lua
 ```
