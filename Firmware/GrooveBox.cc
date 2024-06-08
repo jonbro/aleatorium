@@ -30,8 +30,8 @@ void GrooveBox::init(uint32_t *_color, lua_State *L)
     // usbSerialDevice = _usbSerialDevice;
     needsInitialADC = 30;
     groovebox = this;
-    midi.Init();
-    midi.OnCCChanged = OnCCChangedBare;
+    // midi.Init();
+    // midi.OnCCChanged = OnCCChangedBare;
     ResetADCLatch();
     tempoPhase = 0;
     for(int i=0;i<VOICE_COUNT;i++)
@@ -83,200 +83,150 @@ void __not_in_flash_func(GrooveBox::Render)(int16_t* output_buffer, int16_t* inp
     // update some song parameters
     delay.SetFeedback(songData.GetDelayFeedback());
     delay.SetTime(songData.GetDelayTime());
-    bool hadExternalSync = false;
-    //printf("input %i\n", workBuffer2[0]);
-    for(int i=0;i<SAMPLES_PER_BLOCK;i++)
-    {
-        samples_since_last_sync++;
-        int16_t input = input_buffer[i*2];
-        // collapse input buffer so its easier to copy to the recording device
-        // temporarily use the output buffer
-        recordBuffer[i+recordBufferOffset] = input;
-        
-        if(!audio_sync_state){
-            if(abs(input) > 0x6fff)
-            {
-                // need to recalculate the tempo phase here based on the number of samples that have passed since the last sync
-                // samples since last sync is 1/8th notes, and we need to get up to 96ppq where the phase overflows at 31bits aka 0x7fffffff
-                // 0x7fffffff * 1/(samples_since_last_sync / 2 / 96) - I'm not sure where the 32 is coming from here :/ I just tweaked it until it seemed right
-                tempoPhaseIncrement = ((uint64_t)0x7fffffff*32*96)/samples_since_last_sync;
-                ssls = samples_since_last_sync;
-                samples_since_last_sync = 0;
-                audio_sync_countdown = 0x4ff;
-                audio_sync_state = true;
-                hadExternalSync = true;
-                if(waitingForSync)
-                {
-                    waitingForSync = false;
-                    StartPlaying();
-                }
-            }
-        }
-        else
-        {
-            if(abs(input) < 0x1fff && samples_since_last_sync > 0xff)
-            {
-                audio_sync_state = false;
-            }
-        }
-        if(playThroughEnabled)
-        {
-            if((songData.GetSyncInMode()&(SyncMode24|SyncModePO)) > 0)
-            {
-                workBuffer2[i*2] = input_buffer[i*2+1];
-            }
-            else
-            {
-                workBuffer2[i*2] = input_buffer[i*2];
-            }
-            workBuffer2[i*2+1] = input_buffer[i*2+1];
-        }
-        if(input<0)
-        {
-            input *= -1;
-        }
-        last_input = input>last_input?input:last_input;
-        if(audio_sync_countdown>0)
-            audio_sync_countdown--;
-    }
 
-    // our file system only handles appends every 256 bytes, so we need to respect that
-    recordBufferOffset+=SAMPLES_PER_BLOCK;
-    if(recordBufferOffset==128) recordBufferOffset = 0;
     if(songData.GetSyncInMode() == SyncModeNone)
         CalculateTempoIncrement();
-    if(!recording)
+    for(int v=0;v<VOICE_COUNT;v++)
     {
-        for(int v=0;v<VOICE_COUNT;v++)
+        // put in a request to render the other voice on the second core
+        memset(sync_buffer, 0, SAMPLES_PER_BLOCK);
+        memset(workBuffer, 0, sizeof(int16_t)*SAMPLES_PER_BLOCK);
+        bool hasSecondCore = false;
         {
-            // put in a request to render the other voice on the second core
-            memset(sync_buffer, 0, SAMPLES_PER_BLOCK);
-            memset(workBuffer, 0, sizeof(int16_t)*SAMPLES_PER_BLOCK);
-            bool hasSecondCore = false;
-
-            {
-                memset(workBuffer3, 0, sizeof(int16_t)*SAMPLES_PER_BLOCK);
-                queue_entry_t entry = {false, v, sync_buffer, workBuffer3};
-                queue_add_blocking(&signal_queue, &entry);
-                hasSecondCore = true;
-                v++;
-            }
-            // queue_add_blocking(&signal_queue, &entry);
-            instruments[v].Render(sync_buffer, workBuffer, SAMPLES_PER_BLOCK);
-            // block until second thread render complete
-            if(hasSecondCore)
-            {
-                queue_entry_complete_t result;
-                queue_remove_blocking(&renderCompleteQueue, &result);
-            }
-
-            // mix in the instrument
-            for(int i=0;i<SAMPLES_PER_BLOCK;i++)
-            {
-                workBuffer2[i*2] += mult_q15(workBuffer[i], 0x7fff-instruments[v].GetPan());
-                workBuffer2[i*2+1] += mult_q15(workBuffer[i], instruments[v].GetPan());
-                toDelayBuffer[i] = add_q15(toDelayBuffer[i], mult_q15(workBuffer[i], ((int16_t)instruments[v].delaySend)<<7));
-                toReverbBuffer[i] = add_q15(toReverbBuffer[i], mult_q15(workBuffer[i], ((int16_t)instruments[v].reverbSend)<<7));
-                if(hasSecondCore)
-                {
-                    workBuffer2[i*2] += mult_q15(workBuffer3[i], 0x7fff-instruments[v-1].GetPan());
-                    workBuffer2[i*2+1] += mult_q15(workBuffer3[i], instruments[v-1].GetPan());
-                    toDelayBuffer[i] = add_q15(toDelayBuffer[i], mult_q15(workBuffer3[i], ((int16_t)instruments[v-1].delaySend)<<7));
-                    toReverbBuffer[i] = add_q15(toReverbBuffer[i], mult_q15(workBuffer3[i], ((int16_t)instruments[v-1].reverbSend)<<7));
-                }
-            }
+            memset(workBuffer3, 0, sizeof(int16_t)*SAMPLES_PER_BLOCK);
+            queue_entry_t entry = {false, v, sync_buffer, workBuffer3};
+            queue_add_blocking(&signal_queue, &entry);
+            hasSecondCore = true;
+            v++;
         }
-        bool clipping = false;
+        // queue_add_blocking(&signal_queue, &entry);
+        instruments[v].Render(sync_buffer, workBuffer, SAMPLES_PER_BLOCK);
+        // block until second thread render complete
+        if(hasSecondCore)
+        {
+            queue_entry_complete_t result;
+            queue_remove_blocking(&renderCompleteQueue, &result);
+        }
+
+        // mix in the instrument
         for(int i=0;i<SAMPLES_PER_BLOCK;i++)
         {
-            int16_t* chan = (output_buffer+i*2);
-            int32_t mainL = 0;
-            int32_t mainR = 0;
-            mainL = workBuffer2[i*2];
-            mainR = workBuffer2[i*2+1];
-
-            int16_t l = 0;
-            int16_t r = 0;
-            delay.process(toDelayBuffer[i], l, r);
-            int32_t lres = l;
-            int32_t rres = r;
-            // lower delay volume
-            lres *= 0xe0;
-            rres *= 0xe0;
-            lres = lres >> 8;
-            rres = rres >> 8;
-            mainL += lres;
-            mainR += rres;
-
-            verb.process(toReverbBuffer[i], l, r);
-            lres = l;
-            rres = r;
-            // lower verb volume
-            lres *= 0xe0;
-            rres *= 0xe0;
-            lres = lres >> 8;
-            rres = rres >> 8;
-            mainL += l;
-            mainR += r;
-
-            mainL *= globalVolume;
-            mainR *= globalVolume;
-            mainL = mainL >> 8;
-            mainR = mainR >> 8;
-
-
-            // one more headroom clip
-            // and then hard limit so we don't get overflows
-            int32_t max = 0x7fff;
-            if(mainL > max)
+            workBuffer2[i*2] += mult_q15(workBuffer[i], 0x7fff-instruments[v].GetPan());
+            workBuffer2[i*2+1] += mult_q15(workBuffer[i], instruments[v].GetPan());
+            toDelayBuffer[i] = add_q15(toDelayBuffer[i], mult_q15(workBuffer[i], ((int16_t)instruments[v].delaySend)<<7));
+            toReverbBuffer[i] = add_q15(toReverbBuffer[i], mult_q15(workBuffer[i], ((int16_t)instruments[v].reverbSend)<<7));
+            if(hasSecondCore)
             {
-                clipping = true;
-                mainL = max;
-            }
-            if(mainR > max)
-            {
-                clipping = true;
-                mainR = max;
-            }
-            if(mainL < -max)
-            {
-                clipping = true;
-                mainL = -max;
-            }
-            if(mainR < -max)
-            {
-                clipping = true;
-                mainR = -max;
-            }
-
-            chan[0] = mainL;
-            chan[1] = mainR;
-
-        }
-
-        if(IsPlaying())
-        {
-            bool tempoPulse = false;
-            tempoPhase += tempoPhaseIncrement;
-            if(songData.GetSyncInMode() == SyncModeNone)
-            {
-                if((tempoPhase >> 31) > 0)
-                {
-                    tempoPhase &= 0x7fffffff;
-                    tempoPulse = true;
-                }
-            }
-            if(tempoPulse)
-            {
-                OnTempoPulse();
+                workBuffer2[i*2] += mult_q15(workBuffer3[i], 0x7fff-instruments[v-1].GetPan());
+                workBuffer2[i*2+1] += mult_q15(workBuffer3[i], instruments[v-1].GetPan());
+                toDelayBuffer[i] = add_q15(toDelayBuffer[i], mult_q15(workBuffer3[i], ((int16_t)instruments[v-1].delaySend)<<7));
+                toReverbBuffer[i] = add_q15(toReverbBuffer[i], mult_q15(workBuffer3[i], ((int16_t)instruments[v-1].reverbSend)<<7));
             }
         }
     }
-    absolute_time_t renderEndTime = get_absolute_time();
-    int64_t currentRender = absolute_time_diff_us(renderStartTime, renderEndTime);
-    renderTime += currentRender;
+    bool clipping = false;
+    int16_t l = 0;
+    int16_t r = 0;
+    int32_t mainL = 0;
+    int32_t mainR = 0;
+    for(int i=0;i<SAMPLES_PER_BLOCK;i++)
+    {
+        int16_t* chan = (output_buffer+i*2);
+        mainL = workBuffer2[i*2];
+        mainR = workBuffer2[i*2+1];
+        delay.process(toDelayBuffer[i], l, r);
+        int32_t lres = l;
+        int32_t rres = r;
+        // lower delay volume
+        lres *= 0xe0;
+        rres *= 0xe0;
+        lres = lres >> 8;
+        rres = rres >> 8;
+        workBuffer2[i*2] += lres;
+        workBuffer2[i*2+1] += rres;
+    }
+    for(int i=0;i<SAMPLES_PER_BLOCK;i++)
+    {
+        int16_t* chan = (output_buffer+i*2);
+        mainL = workBuffer2[i*2];
+        mainR = workBuffer2[i*2+1];
+        verb.process(toReverbBuffer[i], l, r);
+        int32_t lres = l;
+        int32_t rres = r;
+        lres = l;
+        rres = r;
+        // lower verb volume
+        lres *= 0xe0;
+        rres *= 0xe0;
+        lres = lres >> 8;
+        rres = rres >> 8;
+        workBuffer2[i*2] += lres;
+        workBuffer2[i*2+1] += rres;
+
+    }
+    for(int i=0;i<SAMPLES_PER_BLOCK;i++)
+    {
+        int16_t* chan = (output_buffer+i*2);
+        mainL = workBuffer2[i*2];
+        mainR = workBuffer2[i*2+1];
+        mainL *= globalVolume;
+        mainR *= globalVolume;
+        mainL = mainL >> 8;
+        mainR = mainR >> 8;
+        // one more headroom clip
+        // and then hard limit so we don't get overflows
+        int32_t max = 0x7fff;
+        if(mainL > max)
+        {
+            clipping = true;
+            mainL = max;
+        }
+        if(mainR > max)
+        {
+            clipping = true;
+            mainR = max;
+        }
+        if(mainL < -max)
+        {
+            clipping = true;
+            mainL = -max;
+        }
+        if(mainR < -max)
+        {
+            clipping = true;
+            mainR = -max;
+        }
+
+        chan[0] = mainL;
+        chan[1] = mainR;
+    }
+    if(clipping)
+    {
+        printf("clipping\n");
+    }
+
+    if(IsPlaying())
+    {
+        bool tempoPulse = false;
+        tempoPhase += tempoPhaseIncrement;
+        if(songData.GetSyncInMode() == SyncModeNone)
+        {
+            if((tempoPhase >> 31) > 0)
+            {
+                tempoPhase &= 0x7fffffff;
+                tempoPulse = true;
+            }
+        }
+        if(tempoPulse)
+        {
+            OnTempoPulse();
+        }
+    }
+    // absolute_time_t renderEndTime = get_absolute_time();
+    // int64_t currentRender = absolute_time_diff_us(renderStartTime, renderEndTime);
+    // renderTime += currentRender;
     sampleCount++;
-    midi.Flush();
+    // midi.Flush();
 }
 void GrooveBox::OnTempoPulse()
 {
@@ -429,10 +379,5 @@ void GrooveBox::OnFinishRecording()
 void GrooveBox::StartPlaying()
 {
     playing = true;
-    if((songData.GetSyncOutMode()&SyncModeMidi) > 0)
-    {
-        midi.StopSequence();
-        midi.StartSequence();
-    }
     ResetPatternOffset();
 }
