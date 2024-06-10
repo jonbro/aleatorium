@@ -1,3 +1,6 @@
+
+resetParams()
+
 for i =0,7 do
 setParam(i, 20, 0)
 setParam(i, 21, 200)
@@ -5,6 +8,7 @@ setParam(i, 44, 0)
 setParam(i, 45, 0)
 setParam(i, 12, 175)
 setParam(i, 47, 200)
+--setParam(i, param.reverbSend, 30)
 end
 
 print(collectgarbage("count"))
@@ -34,19 +38,21 @@ function getBleeper(i, c)
         self.countdown = self.countdown - 1
         if(self.countdown == 0) then
             self.countdown = self.reset
-            if(self.s > #chords[cc]) then
-                self.s = 1
-            end
-            local tc = chords[cc][self.s]+60+self.octave*12
-            playNote(self.i, tc)
-            bl.vol = bl.vol+self.volDir
-            if(self.vol > 80) then self.volDir = -1 end
-            if(self.vol < 30) then self.volDir = 1 end
-            setParam(i, 14, self.vol)
-            setParam(i, 11, self.vol+100)
-            setParam(i, 10, self.vol+30)
+            playNote(self.i, 50+self.i*2+self.s*3)
+            -- if(self.s > #chords[cc]) then
+            --     self.s = 1
+            -- end
+            -- local tc = chords[cc][self.s]+60+self.octave*12
+            -- playNote(self.i, tc)
+            -- bl.vol = bl.vol+self.volDir
+            -- if(self.vol > 80) then self.volDir = -1 end
+            -- if(self.vol < 30) then self.volDir = 1 end
+            -- setParam(i, 14, self.vol)
+            -- setParam(i, 11, self.vol+100)
+            -- setParam(i, 10, self.vol+30)
             self.s = self.s+1
-            --if math.random() > 0.97 then self.countdown = self.countdown*2 end
+            if self.s > 10+self.i then self.s = 0 end
+            -- --if math.random() > 0.97 then self.countdown = self.countdown*2 end
         end
     end
     return bl
@@ -86,19 +92,17 @@ end
 
 local voices = {}
 local primes = {7,11,13,17,19,23,29,31,37}
-for i=0,3 do
+for i=0,4 do
     local v = getBleeper(i,primes[(i%2)+4]);
     table.insert(voices,v)
     if(i%2==0) then v.s = v.s+1 end
 end
 voices[2].octave=2
-table.insert(voices, cBl)
-table.insert(voices, mel)
 local s = 2
 function tempoSync()
     s = s - 1
     if s == 0 then
-        s = 2
+        s = 5
         for k,v in ipairs(voices) do
             v:trigger()
         end

@@ -27,7 +27,6 @@ nanopb_generate_cpp(PROTO_SRCS PROTO_HDRS
         GlobalData.proto
 )
 
-
 # initalize pico_sdk from installed location
 # (note this can come from environment, CMake cache etc)
 set(PICO_SDK_PATH "C:/Users/jonbro/Documents/Pico/pico-sdk")
@@ -54,7 +53,7 @@ add_custom_target(
 pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
-add_executable(tdm
+add_executable(tdm      
         main.cc
         multicore_support.c
         # usb_audio.c
@@ -118,6 +117,7 @@ target_compile_definitions(tdm PRIVATE
 # PICO_AUDIO_I2S_MONO_INPUT=1
 # #define for our example code
 # USE_AUDIO_I2S=1
+PICO_XOSC_STARTUP_DELAY_MULTIPLIER=32
 )
 
 pico_add_extra_outputs(tdm) 
