@@ -18,7 +18,6 @@ void hardware_init();
 void hardware_input_init();
 void hardware_shutdown();
 void hardware_reboot_usb();
-void hardware_check_i2c_pullups(bool *scl, bool *sda);
 bool hardware_get_key_state(uint8_t x, uint8_t y);
 void hardware_get_all_key_state(uint32_t *keystate);
 i2c_dma_t* hardware_get_i2c();

@@ -361,7 +361,7 @@ void GrooveBox::OnAdcUpdate(uint16_t a_in, uint16_t b_in)
         needsInitialADC--;
         return;
     }
-    globalVolume = a;
+    globalVolume = 0xff;
 }
 void GrooveBox::OnFinishRecording()
 {

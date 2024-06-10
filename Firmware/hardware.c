@@ -30,30 +30,27 @@ void hardware_init()
     adc_init();
     adc_gpio_init(26);
 
-    i2c_init(I2C_PORT, 400*1000);
 
     gpio_init(23);
     gpio_set_dir(23, GPIO_IN);
     gpio_set_pulls(23, true, false);
-}
-void hardware_check_i2c_pullups(bool *scl, bool *sda)
-{
-    gpio_set_function(I2C_SDA, GPIO_FUNC_NULL);
-    gpio_set_function(I2C_SCL, GPIO_FUNC_NULL);
-    gpio_set_pulls(I2C_SDA, false, false);
-    gpio_set_pulls(I2C_SCL, false, false);
 
-    gpio_set_dir(I2C_SDA, GPIO_IN);
-    gpio_set_dir(I2C_SCL, GPIO_IN);
-    *scl = gpio_get(I2C_SCL);
-    *sda = gpio_get(I2C_SDA);
+    gpio_init(SUBSYSTEM_RESET_PIN);
+    gpio_set_dir(SUBSYSTEM_RESET_PIN, GPIO_OUT);
+
+    gpio_put(SUBSYSTEM_RESET_PIN, 1);
+    sleep_ms(10);
+    gpio_put(SUBSYSTEM_RESET_PIN, 0);
+    sleep_ms(40);
+    gpio_put(SUBSYSTEM_RESET_PIN, 1);
+    sleep_ms(20);
 
     gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);
     gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);
     gpio_pull_up(I2C_SDA);
     gpio_pull_up(I2C_SCL);
+    
     i2c_init(I2C_PORT, 400*1000);
-
 }
 void hardware_reboot_usb()
 {

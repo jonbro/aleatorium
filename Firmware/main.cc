@@ -44,15 +44,9 @@ extern "C" {
 using namespace braids;
 
 
-#define TLV_I2C_ADDR            0x18
-#define TLV_REG_PAGESELECT	    0
-#define TLV_REG_LDOCONTROL	    2
-#define TLV_REG_RESET   	    1
-#define TLV_REG_CLK_MULTIPLEX   	0x04
-
 #define USING_DEMO_BOARD 0
-#define I2S_DATA_PIN 20
-#define I2S_BCLK_PIN 18
+#define I2S_DATA_PIN 19
+#define I2S_BCLK_PIN 17
 // demo board defines
 
 void on_usb_microphone_tx_ready();
@@ -640,6 +634,7 @@ int main()
     }
 
     hardware_init();
+
     sleep_ms(10);
     if(needsUSBBoot())
     {
@@ -675,7 +670,7 @@ int main()
     memset(capture_buf, SAMPLES_PER_SEND*2, sizeof(uint32_t));
 
     configure_audio_driver();
-
+    tlvDriverInit();
 
     int step = 0;
     uint32_t keyState = 0;
@@ -745,114 +740,117 @@ int main()
             audioOutReady = false;
             mutex_exit(&audioProcessMutex);
         }
+        else if(gbox.syncsRequired > 0)
+        {
+            int error = luaL_dostring(L, "tempoSync()");
+            if (error) {
+                fprintf(stderr, "%s", lua_tostring(L, -1));
+                lua_pop(L, 1);  /* pop error message from the stack */
+            }
+            gbox.syncsRequired--;
+        }
         else
         {
-            while(gbox.syncsRequired > 0)
-            {
-                int error = luaL_dostring(L, "tempoSync()");
-                if (error) {
-                    fprintf(stderr, "%s", lua_tostring(L, -1));
-                    lua_pop(L, 1);  /* pop error message from the stack */
-                }
-                gbox.syncsRequired--;
-            }
-            // we just have one button, so hardcoding
-            {
-                bool btn = gpio_get(23);
-                if(btn)
-                {
-                    keyState |= 1ul << 0;
-                }
-                else
-                {
-                    keyState &= ~(1ul << 0);
-                }
-                uint32_t s = keyState & (1ul<<0);
-                if((keyState & (1ul<<0)) != (lastKeyState & (1ul<<0)) && s == 1)
-                {
-                    //gbox.OnKeyUpdate(i, s>0); 
-                    // get the current files offset
-                    lfs_soff_t off = lfs_dir_tell(GetFilesystem(), &scriptsDir);
-                    // lfs_dir_seek(GetFilesystem(), &scriptsDir, off);
-                    // printf("offset %i\n", off);
-
-                    // attempt to read next file
-                    bool stopFinding = false;
-                    while(!stopFinding)
-                    {
-                        int res = lfs_dir_read(GetFilesystem(), &scriptsDir, &info);
-                        if(res == 0)
-                        {
-                            lfs_dir_rewind(GetFilesystem(), &scriptsDir);
-                            continue;
-                        }
-                        lfs_soff_t newOff = lfs_dir_tell(GetFilesystem(), &scriptsDir);
-                        if(newOff == off)
-                        {
-                            char path[1024];
-                            sprintf(path, "scripts/%s", info.name);
-                            printf("only one file in scripts: %s\n", path);
-                            stopFinding = true;
-                            continue;
-                        }
-                        if(res >= 0 && info.type == LFS_TYPE_REG)
-                        {
-                            char path[1024];
-                            sprintf(path, "scripts/%s", info.name);
-
-                            lfs_file_t file;
-                            // attempt to open this file
-                            printf("attempt to open file: %s\n", path);
-                            int e = lfs_file_open(GetFilesystem(), &file, path, LFS_O_RDONLY);
-                            if(e < LFS_ERR_OK)
-                            {
-                                printf("file open error: %i\n", e);
-                            }
-                            e = lfs_file_read(GetFilesystem(), &file, incomingData, info.size);
-                            if(e < LFS_ERR_OK)
-                            {
-                                printf("file read error: %i\n", e);
-                            }
-                            error = luaL_dostring(L, incomingData);
-                            if (error) {
-                                fprintf(stderr, "%s", lua_tostring(L, -1));
-                                lua_pop(L, 1);  /* pop error message from the stack */
-                                lfs_file_close(GetFilesystem(), &file);
-                            }
-                            // this should work fine, lets just go with it
-                            lfs_file_close(GetFilesystem(), &file);
-                            stopFinding = true;
-                            continue;
-                        }
-                    }
-                    
-                }
-                lastKeyState = keyState;
-            }
-            if(needsScreenupdate)
-            {
-                adc_select_input(0);
-                uint16_t adc_val = adc_read();
-                // adc_select_input(0);
-                // // I think that even though adc_read returns 16 bits, the value is only in the top 12
-                // also the pot is wired backwards, so invert
-                gbox.OnAdcUpdate(0xfff-adc_val, 0x00);
-                // hardware_update_battery_level();
-                queue_entry_complete_t result;
-                //gbox.UpdateDisplay(GetDisplay());
-                // hardware_has_usb_power(); // this call just turns on the green debug led currently
-                // ssd1306_show(GetDisplay());
-                // ws2812_setColors(color+5);
-                needsScreenupdate = false;
-                // ws2812_trigger();
-                int error = luaL_dostring(L, "update()");
-                if (error) {
-                    fprintf(stderr, "%s", lua_tostring(L, -1));
-                    lua_pop(L, 1);
-                }
-
-            }
+            lua_gc(L, LUA_GCSTEP, 1);
         }
+
+        // we just have one button, so hardcoding
+        {
+            // bool btn = gpio_get(23);
+            // if(btn)
+            // {
+            //     keyState |= 1ul << 0;
+            // }
+            // else
+            // {
+            //     keyState &= ~(1ul << 0);
+            // }
+            // uint32_t s = keyState & (1ul<<0);
+            // if((keyState & (1ul<<0)) != (lastKeyState & (1ul<<0)) && s == 1)
+            // {
+            //     //gbox.OnKeyUpdate(i, s>0); 
+            //     // get the current files offset
+            //     lfs_soff_t off = lfs_dir_tell(GetFilesystem(), &scriptsDir);
+            //     // lfs_dir_seek(GetFilesystem(), &scriptsDir, off);
+            //     // printf("offset %i\n", off);
+
+            //     // attempt to read next file
+            //     bool stopFinding = false;
+            //     while(!stopFinding)
+            //     {
+            //         int res = lfs_dir_read(GetFilesystem(), &scriptsDir, &info);
+            //         if(res == 0)
+            //         {
+            //             lfs_dir_rewind(GetFilesystem(), &scriptsDir);
+            //             continue;
+            //         }
+            //         lfs_soff_t newOff = lfs_dir_tell(GetFilesystem(), &scriptsDir);
+            //         if(newOff == off)
+            //         {
+            //             char path[1024];
+            //             sprintf(path, "scripts/%s", info.name);
+            //             printf("only one file in scripts: %s\n", path);
+            //             stopFinding = true;
+            //             continue;
+            //         }
+            //         if(res >= 0 && info.type == LFS_TYPE_REG)
+            //         {
+            //             char path[1024];
+            //             sprintf(path, "scripts/%s", info.name);
+
+            //             lfs_file_t file;
+            //             // attempt to open this file
+            //             printf("attempt to open file: %s\n", path);
+            //             int e = lfs_file_open(GetFilesystem(), &file, path, LFS_O_RDONLY);
+            //             if(e < LFS_ERR_OK)
+            //             {
+            //                 printf("file open error: %i\n", e);
+            //             }
+            //             e = lfs_file_read(GetFilesystem(), &file, incomingData, info.size);
+            //             if(e < LFS_ERR_OK)
+            //             {
+            //                 printf("file read error: %i\n", e);
+            //             }
+            //             error = luaL_dostring(L, incomingData);
+            //             if (error) {
+            //                 fprintf(stderr, "%s", lua_tostring(L, -1));
+            //                 lua_pop(L, 1);  /* pop error message from the stack */
+            //                 lfs_file_close(GetFilesystem(), &file);
+            //             }
+            //             // this should work fine, lets just go with it
+            //             lfs_file_close(GetFilesystem(), &file);
+            //             stopFinding = true;
+            //             continue;
+            //         }
+            //     }
+                
+            // }
+            // lastKeyState = keyState;
+        }
+        if(true == false && needsScreenupdate)
+        {
+            adc_select_input(0);
+            uint16_t adc_val = adc_read();
+            // adc_select_input(0);
+            // // I think that even though adc_read returns 16 bits, the value is only in the top 12
+            // also the pot is wired backwards, so invert
+            gbox.OnAdcUpdate(0xfff-adc_val, 0x00);
+            // hardware_update_battery_level();
+            queue_entry_complete_t result;
+            //gbox.UpdateDisplay(GetDisplay());
+            // hardware_has_usb_power(); // this call just turns on the green debug led currently
+            // ssd1306_show(GetDisplay());
+            // ws2812_setColors(color+5);
+            needsScreenupdate = false;
+            // ws2812_trigger();
+            int error = luaL_dostring(L, "update()");
+            if (error) {
+                fprintf(stderr, "%s", lua_tostring(L, -1));
+                lua_pop(L, 1);
+            }
+
+        }
+        
     }
     return 0;
 }
