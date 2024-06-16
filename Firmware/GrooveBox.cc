@@ -162,7 +162,6 @@ void __not_in_flash_func(GrooveBox::Render)(int16_t* output_buffer, int16_t* inp
         rres = rres >> 8;
         workBuffer2[i*2] += lres;
         workBuffer2[i*2+1] += rres;
-
     }
     for(int i=0;i<SAMPLES_PER_BLOCK;i++)
     {
@@ -292,37 +291,6 @@ bool GrooveBox::IsPlaying()
     return playing;
 }
 
-uint32_t screen_lfo_phase = 0;
-void GrooveBox::LowBatteryDisplay(ssd1306_t *p)
-{
-    drawCount++;
-    LowBatteryDisplayInternal(p);
-    // after a few seconds, force shutdown the system
-    const int sixseconds = 30*6;
-    if(drawCount > sixseconds)
-        hardware_shutdown();
-}
-void GrooveBox::LowBatteryDisplayInternal(ssd1306_t *p)
-{
-    // blink the low battery indicator for 2 seconds every 20 seconds
-    const int eightseconds = 30*8;
-    const int twoseconds = 30*2;
-    if(drawCount%eightseconds<twoseconds)
-    {
-        // low battery display
-        ssd1306_clear_square(p, 0, 0, 45, 16);
-        ssd1306_draw_square_rounded(p, 2, 2, 36, 12);
-        // bump at the top of the battery
-        ssd1306_draw_square_rounded(p, 35, 5, 6, 6);
-        ssd1306_clear_square_rounded(p, 34, 6, 6, 4);
-        // clear center of battery
-        ssd1306_clear_square_rounded(p, 3, 3, 34, 10);
-
-        // battery fill
-        if(drawCount%20>10)
-            ssd1306_draw_square_rounded(p, 4, 4, 6, 8);
-    }
-}
 void GrooveBox::SetGlobalParameter(uint8_t a, uint8_t b, bool setA, bool setB)
 {
     // references must be initialized and can't change
@@ -346,22 +314,19 @@ void GrooveBox::SetGlobalParameter(uint8_t a, uint8_t b, bool setA, bool setB)
     }
 }
 
-void GrooveBox::OnAdcUpdate(uint16_t a_in, uint16_t b_in)
+void GrooveBox::OnAdcUpdate(uint16_t a_in)
 {
     // interpolate the input values
     uint16_t interpolationbias = 0xd000; 
     AdcInterpolatedA = (((uint32_t)a_in)*(0xffff-interpolationbias) + ((uint32_t)AdcInterpolatedA)*interpolationbias)>>16;
-    AdcInterpolatedB = (((uint32_t)b_in)*(0xffff-interpolationbias) + ((uint32_t)AdcInterpolatedB)*interpolationbias)>>16;
     uint8_t a = AdcInterpolatedA>>4;
-    uint8_t b = AdcInterpolatedB>>4; 
     if(needsInitialADC > 0)
     {
         lastAdcValA = a;
-        lastAdcValB = b;
         needsInitialADC--;
         return;
     }
-    globalVolume = 0xff;
+    globalVolume = a;
 }
 void GrooveBox::OnFinishRecording()
 {

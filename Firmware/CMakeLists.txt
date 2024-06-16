@@ -37,7 +37,7 @@ set(PICO_BOARD "tdm_board")
 include(pico_sdk_import.cmake)
 include(pico_extras_import.cmake)
 
-project(tdm C CXX ASM)
+project(aleatorium C CXX ASM)
 
 set (py_cmd "lua_to_cstrings.py")
 
@@ -53,7 +53,7 @@ add_custom_target(
 pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
-add_executable(tdm      
+add_executable(aleatorium      
         main.cc
         multicore_support.c
         # usb_audio.c
@@ -68,7 +68,8 @@ add_executable(tdm
         tlv320driver.c
         ssd1306.c
         ws2812.c
-        hardware.c
+        hardware_audcalc.c
+        hardware_aleatorium.c
         audio/macro_oscillator.cc
         i2c_dma.c
         audio/analog_oscillator.cc
@@ -85,22 +86,22 @@ add_executable(tdm
         littlefs/lfs.c
         littlefs/lfs_util.c
 )
-pico_generate_pio_header(tdm ${CMAKE_CURRENT_LIST_DIR}/input_output_copy_i2s.pio)
-pico_generate_pio_header(tdm ${CMAKE_CURRENT_LIST_DIR}/ws2812.pio)
+pico_generate_pio_header(aleatorium ${CMAKE_CURRENT_LIST_DIR}/input_output_copy_i2s.pio)
+pico_generate_pio_header(aleatorium ${CMAKE_CURRENT_LIST_DIR}/ws2812.pio)
 
-pico_set_program_name(tdm "tdm")
-pico_set_program_version(tdm "0.1")
+pico_set_program_name(aleatorium "aleatorium")
+pico_set_program_version(aleatorium "0.1")
 
-pico_enable_stdio_usb(tdm 0)
-pico_enable_stdio_uart(tdm 1)
+pico_enable_stdio_usb(aleatorium 0)
+pico_enable_stdio_uart(aleatorium 1)
 
-add_dependencies(tdm generateLuaStrings)
+add_dependencies(aleatorium generateLuaStrings)
 
 
-target_include_directories(tdm PRIVATE ${CMAKE_CURRENT_LIST_DIR})
+target_include_directories(aleatorium PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
 # Add any user requested libraries
-target_link_libraries(tdm
+target_link_libraries(aleatorium
         pico_stdlib
         pico_multicore
         hardware_sleep
@@ -113,11 +114,10 @@ target_link_libraries(tdm
         tinyusb_device
         tinyusb_board
         )
-target_compile_definitions(tdm PRIVATE
-# PICO_AUDIO_I2S_MONO_INPUT=1
-# #define for our example code
-# USE_AUDIO_I2S=1
+target_compile_definitions(aleatorium PRIVATE
+# HARDWARE_AUDCALC=1
+HARDWARE_ALEATORIUM=1
 PICO_XOSC_STARTUP_DELAY_MULTIPLIER=32
 )
 
-pico_add_extra_outputs(tdm) 
+pico_add_extra_outputs(aleatorium)

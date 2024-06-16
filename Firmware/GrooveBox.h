@@ -28,8 +28,7 @@ extern "C" {
 class GrooveBox {
  public:
   void init(uint32_t *_color, lua_State *L);
-  void LowBatteryDisplay(ssd1306_t *p);
-  void OnAdcUpdate(uint16_t a, uint16_t b);
+  void OnAdcUpdate(uint16_t a);
   void SetGlobalParameter(uint8_t a, uint8_t b, bool setA, bool setB);
   bool IsPlaying();
   int GetNote();
@@ -101,7 +100,6 @@ class GrooveBox {
   int syncsRequired = 0;
  private:
   lua_State *L;
-  void LowBatteryDisplayInternal(ssd1306_t *p);
   void SaveAndShutdown();
   USBSerialDevice *usbSerialDevice;
   MidiParamMapper midiMap;

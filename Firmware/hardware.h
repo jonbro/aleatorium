@@ -14,22 +14,21 @@
 extern "C" {
 #endif
 
+#ifdef HARDWARE_AUDCALC
+#define I2S_DATA_PIN 19
+#define I2S_BCLK_PIN 17
+#elif HARDWARE_ALEATORIUM
+#define I2S_DATA_PIN 20
+#define I2S_BCLK_PIN 18
+#endif
+
 void hardware_init();
-void hardware_input_init();
+void hardware_post_audio_init();
 void hardware_shutdown();
 void hardware_reboot_usb();
-bool hardware_get_key_state(uint8_t x, uint8_t y);
-void hardware_get_all_key_state(uint32_t *keystate);
-i2c_dma_t* hardware_get_i2c();
-
-uint8_t hardware_get_battery_level();
-float hardware_get_battery_level_float();
-bool hardware_has_usb_power();
-void hardware_update_battery_level();
-void hardware_set_mic(bool mic_state);
-bool hardware_line_in_detected();
-bool hardware_headphone_detected();
-bool hardware_disable_power_latch();
+bool hardware_get_button_state();
+uint16_t hardware_get_adc_value();
+void hardware_update();
 
 #ifdef __cplusplus
 }
