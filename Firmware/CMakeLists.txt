@@ -1,6 +1,7 @@
 # Generated Cmake Pico project file
 
 cmake_minimum_required(VERSION 3.13)
+include(pico_sdk_import.cmake)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -19,6 +20,8 @@ set(LUA_INCLUDE_DIRS "${CMAKE_CURRENT_LIST_DIR}/lua-5.4.3/src")
 include_directories(${LUA_INCLUDE_DIRS})
 include_directories("${CMAKE_CURRENT_LIST_DIR}/LuaAutoC")
 
+set(NANOPB_SRC_ROOT_FOLDER "${CMAKE_CURRENT_LIST_DIR}/nanopb")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${NANOPB_SRC_ROOT_FOLDER}/extra)
 find_package(Nanopb REQUIRED)
 include_directories(${NANOPB_INCLUDE_DIRS})
 nanopb_generate_cpp(PROTO_SRCS PROTO_HDRS
@@ -27,11 +30,6 @@ nanopb_generate_cpp(PROTO_SRCS PROTO_HDRS
         GlobalData.proto
 )
 
-# initalize pico_sdk from installed location
-# (note this can come from environment, CMake cache etc)
-set(PICO_SDK_PATH "C:/Users/jonbro/Documents/Pico/pico-sdk")
-set(PICO_BOARD_HEADER_DIRS ${CMAKE_CURRENT_LIST_DIR})
-set(PICO_BOARD "tdm_board")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
