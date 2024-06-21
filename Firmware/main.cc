@@ -281,6 +281,11 @@ static int l_setParam(lua_State *L)
     current_a = luaL_checknumber(L, 3);
     return 0;
 }
+static int l_getPot(lua_State *L)
+{
+    lua_pushnumber(L, gbox.globalVolume);
+    return 1;
+}
 static int l_resetParams(lua_State *L)
 {
     for(int i=0;i<8;i++)
@@ -605,6 +610,9 @@ int main()
     lua_setglobal(L, "setParam");
     lua_pushcfunction(L, l_resetParams);
     lua_setglobal(L, "resetParams");
+    lua_pushcfunction(L, l_getPot);
+    lua_setglobal(L, "getPot");
+    
     e = luaL_dostring(L, global_lua);
     if(e)
     {
